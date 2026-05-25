@@ -1,0 +1,44 @@
+Конфигурация nginx (универсальный шаблон для всех трёх)
+Отличия только в директивах server_name (необязательно) и в описаниях location для цепочек. Привожу конфигурацию nginx1, остальные аналогичны (меняются имена в цепочках).
+
+nginx1/default.conf
+# Карта: доверенный ли источник
+map $remote_addr $trusted {
+    include /etc/nginx/trusted.conf;
+    default "no";
+}
+
+server {
+    listen 80;
+
+    # Устанавливаем X-Forwarded-For
+    set $xff $remote_addr;
+
+    # Если запрос пришёл от доверенного прокси, добавляем существующий заголовок
+    if ($trusted = "yes") {
+        set $xff "$http_x_forwarded_for, $remote_addr";
+    }
+    # Убираем артефакт пустого $http_x_forwarded_for (запятая перед IP)
+    if ($http_x_forwarded_for = "") {
+        set $xff $remote_addr;
+    }
+
+    location / {
+        proxy_set_header X-Forwarded-For $xff;
+        proxy_pass http://app:80;
+    }
+
+    # Цепочка: nginx1 -> nginx2
+    location /chain/nginx2/ {
+        rewrite ^/chain/nginx2(/.*)$ $1 break;
+        proxy_set_header X-Forwarded-For $xff;
+        proxy_pass http://nginx2:80;
+    }
+
+    # Цепочка: nginx1 -> nginx3
+    location /chain/nginx3/ {
+        rewrite ^/chain/nginx3(/.*)$ $1 break;
+        proxy_set_header X-Forwarded-For $xff;
+        proxy_pass http://nginx3:80;
+    }
+}
