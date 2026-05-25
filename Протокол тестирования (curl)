@@ -1,0 +1,43 @@
+Перед тестами запускаем стенд:
+
+bash
+docker-compose up -d
+1. Прямой запрос на nginx1 с попыткой подделать заголовок
+
+bash
+curl -v http://localhost:8081/ -H "X-Forwarded-For: 1.2.3.4"
+Ожидаемый результат: в ответе JSON от ealen/echo-server поле x-forwarded-for содержит только реальный IP клиента (IP хоста, например 172.20.0.1). Подставленный 1.2.3.4 проигнорирован.
+
+2. Цепочка nginx1 → nginx2 → приложение
+
+bash
+curl http://localhost:8081/chain/nginx2/
+Ожидаемый результат: x-forwarded-for = client_ip, 172.20.0.10, 172.20.0.20
+Реальный IP клиента + IP первого прокси + IP второго.
+
+3. Прямой запрос на nginx2 с подделкой
+
+bash
+curl http://localhost:8082/ -H "X-Forwarded-For: fake"
+Ожидаемый результат: только реальный IP клиента.
+
+4. Длинная цепочка nginx1 → nginx2 → nginx3 → приложение
+
+bash
+curl http://localhost:8081/chain/nginx2/chain/nginx3/
+Ожидаемый результат: x-forwarded-for = client_ip, 172.20.0.10, 172.20.0.20, 172.20.0.30
+
+5. Проверка, что внутренние прокси не пропускают чужой заголовок извне
+Отправляем запрос на nginx1, который пойдёт в цепочку nginx1→nginx2, и при этом сами подсовываем заголовок.
+
+bash
+curl http://localhost:8081/chain/nginx2/ -H "X-Forwarded-For: evil"
+Ожидаемый результат: x-forwarded-for содержит реальный IP клиента и IP прокси, evil отсутствует.
+
+6. Прямой запрос на nginx3
+
+bash
+curl http://localhost:8083/
+Ожидаемый результат: x-forwarded-for = client_ip.
+
+Все тесты проходят успешно — приложение получает корректную цепочку, а попытки инъекции игнорируются.
