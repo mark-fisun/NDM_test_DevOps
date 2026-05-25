@@ -1,0 +1,11 @@
+.
+├── docker-compose.yml
+├── trusted.conf
+├── app
+│   └── (используется готовый образ)
+├── nginx1
+│   └── default.conf
+├── nginx2
+│   └── default.conf
+└── nginx3
+    └── default.conf
